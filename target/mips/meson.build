@@ -8,6 +8,10 @@ mips_ss.add(files(
   'msa.c',
 ))
 
+if get_option('tracewrap')
+  mips_ss.add(files('trace_helper.c'))
+endif
+
 if have_system
   subdir('sysemu')
 endif

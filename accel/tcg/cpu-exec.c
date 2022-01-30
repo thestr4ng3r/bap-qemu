@@ -962,10 +962,12 @@ int cpu_exec(CPUState *cpu)
                 last_tb = NULL;
             }
 #endif
+#ifndef HAS_TRACEWRAP
             /* See if we can patch the calling TB. */
             if (last_tb) {
                 tb_add_jump(last_tb, tb_exit, tb);
             }
+#endif
 
             cpu_loop_exec_tb(cpu, tb, &last_tb, &tb_exit);
 

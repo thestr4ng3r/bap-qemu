@@ -22,6 +22,17 @@ DEF_HELPER_FLAGS_5(bndstx32, TCG_CALL_NO_WG, void, env, tl, tl, i64, i64)
 DEF_HELPER_FLAGS_5(bndstx64, TCG_CALL_NO_WG, void, env, tl, tl, i64, i64)
 DEF_HELPER_1(bnd_jmp, void, env)
 
+#ifdef HAS_TRACEWRAP
+DEF_HELPER_1(trace_newframe, void, tl)
+DEF_HELPER_3(trace_endframe, void, env, tl, tl)
+DEF_HELPER_2(trace_load_reg, void, tl, tl)
+DEF_HELPER_2(trace_store_reg, void, tl, tl)
+DEF_HELPER_3(trace_ld, void, env, tl, tl)
+DEF_HELPER_3(trace_st, void, env, tl, tl)
+DEF_HELPER_1(trace_load_eflags, void, env)
+DEF_HELPER_1(trace_store_eflags, void, env)
+#endif //HAS_TRACEWRAP
+
 DEF_HELPER_2(aam, void, env, int)
 DEF_HELPER_2(aad, void, env, int)
 DEF_HELPER_1(aaa, void, env)

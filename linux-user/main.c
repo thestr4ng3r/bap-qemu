@@ -55,6 +55,11 @@
 #define AT_FLAGS_PRESERVE_ARGV0 (1 << AT_FLAGS_PRESERVE_ARGV0_BIT)
 #endif
 
+#ifdef HAS_TRACEWRAP
+#include "tracewrap.h"
+const char * qemu_tracefilename = NULL;
+#endif //HAS_TRACEWRAP
+
 char *exec_path;
 
 int singlestep;
@@ -382,6 +387,13 @@ static void handle_arg_strace(const char *arg)
     enable_strace = true;
 }
 
+#ifdef HAS_TRACEWRAP
+static void handle_trace_filename(const char *arg)
+{
+    qemu_tracefilename = arg;
+}
+#endif //HAS_TRACEWRAP
+
 static void handle_arg_version(const char *arg)
 {
     printf("qemu-" TARGET_NAME " version " QEMU_FULL_VERSION
@@ -471,6 +483,10 @@ static const struct qemu_argument arg_table[] = {
     {"xtensa-abi-call0", "QEMU_XTENSA_ABI_CALL0", false, handle_arg_abi_call0,
      "",           "assume CALL0 Xtensa ABI"},
 #endif
+#ifdef HAS_TRACEWRAP
+    {"tracefile",  "", true, handle_trace_filename,
+     "file", "path to trace file (defaults to <target>.frames)"},
+#endif //HAS_TRACEWRAP
     {NULL, NULL, false, NULL, NULL, NULL}
 };
 
@@ -821,6 +837,11 @@ int main(int argc, char **argv, char **envp)
         target_argv[i] = strdup(argv[optind + i]);
     }
     target_argv[target_argc] = NULL;
+
+#ifdef HAS_TRACEWRAP
+    qemu_trace_init(qemu_tracefilename, exec_path,
+        argv, environ, target_argv, target_environ);
+#endif //HAS_TRACEWRAP
 
     ts = g_new0(TaskState, 1);
     init_task_state(ts);

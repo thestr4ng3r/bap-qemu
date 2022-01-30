@@ -25,6 +25,10 @@
 #include "trace.h"
 #include "signal-common.h"
 
+#ifdef HAS_TRACEWRAP
+#include "tracewrap.h"
+#endif //HAS_TRACEWRAP
+
 static struct target_sigaction sigact_table[TARGET_NSIG];
 
 static void host_signal_handler(int host_signum, siginfo_t *info,
@@ -676,6 +680,10 @@ static void QEMU_NORETURN dump_core_and_abort(int target_sig)
     host_sig = target_to_host_signal(target_sig);
     trace_user_force_sig(env, target_sig, host_sig);
     gdb_signalled(env, target_sig);
+
+    #ifdef HAS_TRACEWRAP
+      qemu_trace_finish(-target_sig);
+    #endif //HAS_TRACEWRAP
 
     /* dump core if supported by target binary format */
     if (core_dump_signal(target_sig) && (ts->bprm->core_dump != NULL)) {

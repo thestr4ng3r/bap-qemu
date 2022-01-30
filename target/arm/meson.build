@@ -36,6 +36,9 @@ arm_ss.add(files(
   'vfp_helper.c',
   'cpu_tcg.c',
 ))
+if get_option('tracewrap')
+  arm_ss.add(files('trace_helper.c'))
+endif
 arm_ss.add(zlib)
 
 arm_ss.add(when: 'CONFIG_KVM', if_true: files('kvm.c', 'kvm64.c'), if_false: files('kvm-stub.c'))

@@ -16,6 +16,15 @@ DEF_HELPER_3(lld, tl, env, tl, int)
 #endif
 #endif
 
+#ifdef HAS_TRACEWRAP
+DEF_HELPER_1(trace_newframe, void, tl)
+DEF_HELPER_3(trace_endframe, void, env, tl, i32)
+DEF_HELPER_2(trace_load_reg, void, i32, i32)
+DEF_HELPER_2(trace_store_reg, void, i32, i32)
+DEF_HELPER_3(trace_ld, void, env, i32, i32)
+DEF_HELPER_3(trace_st, void, env, i32, i32)
+#endif //HAS_TRACEWRAP
+
 DEF_HELPER_3(muls, tl, env, tl, tl)
 DEF_HELPER_3(mulsu, tl, env, tl, tl)
 DEF_HELPER_3(macc, tl, env, tl, tl)

@@ -80,6 +80,9 @@
 #ifdef HAVE_SYS_KCOV_H
 #include <sys/kcov.h>
 #endif
+#ifdef HAS_TRACEWRAP
+#include "tracewrap.h"
+#endif //HAS_TRACEWRAP
 
 #define termios host_termios
 #define winsize host_winsize
@@ -10103,6 +10106,9 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
         /* new thread calls */
     case TARGET_NR_exit_group:
         preexit_cleanup(cpu_env, arg1);
+#ifdef HAS_TRACEWRAP
+        qemu_trace_finish(arg1);
+#endif //HAS_TRACEWRAP
         return get_errno(exit_group(arg1));
 #endif
     case TARGET_NR_setdomainname:
