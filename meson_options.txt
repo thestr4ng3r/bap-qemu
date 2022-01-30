@@ -204,3 +204,8 @@ option('fdt', type: 'combo', value: 'auto',
 
 option('selinux', type: 'feature', value: 'auto',
        description: 'SELinux support in qemu-nbd')
+
+option('tracewrap', type : 'boolean', value : false,
+       description: 'tracewrap (bap-frames) compression support')
+option('tracewrap_dir', type : 'string', value : '',
+       description: 'path to bap-frames')

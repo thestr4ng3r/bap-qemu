@@ -16,6 +16,15 @@ DEF_HELPER_3(lld, tl, env, tl, int)
 #endif
 #endif
 
+#ifdef HAS_TRACEWRAP
+DEF_HELPER_1(trace_newframe, void, tl)
+DEF_HELPER_3(trace_endframe, void, env, tl, i32)
+DEF_HELPER_2(trace_load_reg, void, i32, i32)
+DEF_HELPER_2(trace_store_reg, void, i32, i32)
+DEF_HELPER_3(trace_ld, void, env, i32, i32)
+DEF_HELPER_3(trace_st, void, env, i32, i32)
+#endif //HAS_TRACEWRAP
+
 DEF_HELPER_FLAGS_1(bitswap, TCG_CALL_NO_RWG_SE, tl, tl)
 #ifdef TARGET_MIPS64
 DEF_HELPER_FLAGS_1(dbitswap, TCG_CALL_NO_RWG_SE, tl, tl)

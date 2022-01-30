@@ -129,6 +129,10 @@
 
 #include "config-host.h"
 
+#ifdef HAS_TRACEWRAP
+#include "gtracewrap.h"
+#endif
+
 #define MAX_VIRTIO_CONSOLES 1
 
 typedef struct BlockdevOptionsQueueEntry {
@@ -174,6 +178,9 @@ static int num_serial_hds;
 static Chardev **serial_hds;
 static const char *log_mask;
 static const char *log_file;
+#ifdef HAS_TRACEWRAP
+    const char *tracefile = NULL;
+#endif
 static bool list_data_dirs;
 static const char *watchdog;
 static const char *qtest_chrdev;
@@ -3133,6 +3140,11 @@ void qemu_init(int argc, char **argv, char **envp)
                     monitor_parse(optarg, "readline", false);
                 }
                 break;
+#ifdef HAS_TRACEWRAP
+            case QEMU_OPTION_tracefile:
+                tracefile = optarg;
+                break;
+#endif
             case QEMU_OPTION_qmp:
                 monitor_parse(optarg, "control", false);
                 default_monitor = 0;
@@ -3665,6 +3677,10 @@ void qemu_init(int argc, char **argv, char **envp)
             }
         }
     }
+#ifdef HAS_TRACEWRAP
+    do_qemu_set_trace(tracefile,0,NULL);
+#endif
+
     /*
      * Clear error location left behind by the loop.
      * Best done right after the loop.  Do not insert code here!

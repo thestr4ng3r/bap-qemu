@@ -6,6 +6,9 @@ i386_ss.add(files(
   'xsave_helper.c',
   'cpu-dump.c',
 ))
+if get_option('tracewrap')
+  i386_ss.add(files('trace_helper.c'))
+endif
 i386_ss.add(when: 'CONFIG_SEV', if_true: files('host-cpu.c'))
 
 # x86 cpu type

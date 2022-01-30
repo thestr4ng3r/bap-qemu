@@ -66,6 +66,11 @@ static const char * const regnames[] =
       "r8", "r9", "r10", "r11", "r12", "r13", "r14", "pc" };
 
 
+#ifdef HAS_TRACEWRAP
+/* Set to 1 if an instruction affects cpsr. */
+static int store_cpsr = 0;
+#endif //HAS_TRACEWRAP
+
 /* initialize TCG globals.  */
 void arm_translate_init(void)
 {
@@ -252,6 +257,22 @@ static uint32_t read_pc(DisasContext *s)
     return s->pc_curr + (s->thumb ? 4 : 8);
 }
 
+#ifdef HAS_TRACEWRAP
+static void gen_trace_load_reg(int reg, TCGv_i32 var)
+{
+    TCGv t = tcg_const_i32(reg);
+    gen_helper_trace_load_reg(t, var);
+    tcg_temp_free(t);
+}
+
+static void gen_trace_store_reg(int reg, TCGv_i32 var)
+{
+    TCGv t = tcg_const_i32(reg);
+    gen_helper_trace_store_reg(t, var);
+    tcg_temp_free(t);
+}
+#endif //HAS_TRACEWRAP
+
 /* Set a variable to the value of a CPU register.  */
 void load_reg_var(DisasContext *s, TCGv_i32 var, int reg)
 {
@@ -260,6 +281,9 @@ void load_reg_var(DisasContext *s, TCGv_i32 var, int reg)
     } else {
         tcg_gen_mov_i32(var, cpu_R[reg]);
     }
+#ifdef HAS_TRACEWRAP
+    gen_trace_load_reg(reg, var);
+#endif //HAS_TRACEWRAP
 }
 
 /*
@@ -276,6 +300,9 @@ TCGv_i32 add_reg_for_lit(DisasContext *s, int reg, int ofs)
     } else {
         tcg_gen_addi_i32(tmp, cpu_R[reg], ofs);
     }
+#ifdef HAS_TRACEWRAP
+    gen_trace_load_reg(reg, tmp);
+#endif //HAS_TRACEWRAP
     return tmp;
 }
 
@@ -283,6 +310,9 @@ TCGv_i32 add_reg_for_lit(DisasContext *s, int reg, int ofs)
    marked as dead.  */
 void store_reg(DisasContext *s, int reg, TCGv_i32 var)
 {
+#ifdef HAS_TRACEWRAP
+    gen_trace_store_reg(reg, var);
+#endif //HAS_TRACEWRAP
     if (reg == 15) {
         /* In Thumb mode, we must ignore bit 0.
          * In ARM mode, for ARMv4 and ARMv5, it is UNPREDICTABLE if bits [1:0]
@@ -427,6 +457,9 @@ static inline void gen_logic_CC(TCGv_i32 var)
 {
     tcg_gen_mov_i32(cpu_NF, var);
     tcg_gen_mov_i32(cpu_ZF, var);
+#ifdef HAS_TRACEWRAP
+    store_cpsr = 1;
+#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 + T1 + CF. */
@@ -434,6 +467,9 @@ static void gen_add_carry(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 {
     tcg_gen_add_i32(dest, t0, t1);
     tcg_gen_add_i32(dest, dest, cpu_CF);
+#ifdef HAS_TRACEWRAP
+    store_cpsr = 1;
+#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 - T1 + CF - 1.  */
@@ -442,6 +478,9 @@ static void gen_sub_carry(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
     tcg_gen_sub_i32(dest, t0, t1);
     tcg_gen_add_i32(dest, dest, cpu_CF);
     tcg_gen_subi_i32(dest, dest, 1);
+#ifdef HAS_TRACEWRAP
+    store_cpsr = 1;
+#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 + T1. Compute C, N, V and Z flags */
@@ -456,6 +495,9 @@ static void gen_add_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
     tcg_gen_andc_i32(cpu_VF, cpu_VF, tmp);
     tcg_temp_free_i32(tmp);
     tcg_gen_mov_i32(dest, cpu_NF);
+#ifdef HAS_TRACEWRAP
+    store_cpsr = 1;
+#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 + T1 + CF.  Compute C, N, V and Z flags */
@@ -484,6 +526,9 @@ static void gen_adc_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
     tcg_gen_andc_i32(cpu_VF, cpu_VF, tmp);
     tcg_temp_free_i32(tmp);
     tcg_gen_mov_i32(dest, cpu_NF);
+#ifdef HAS_TRACEWRAP
+    store_cpsr = 1;
+#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 - T1. Compute C, N, V and Z flags */
@@ -499,6 +544,9 @@ static void gen_sub_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
     tcg_gen_and_i32(cpu_VF, cpu_VF, tmp);
     tcg_temp_free_i32(tmp);
     tcg_gen_mov_i32(dest, cpu_NF);
+#ifdef HAS_TRACEWRAP
+    store_cpsr = 1;
+#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 + ~T1 + CF.  Compute C, N, V and Z flags */
@@ -508,6 +556,9 @@ static void gen_sbc_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
     tcg_gen_not_i32(tmp, t1);
     gen_adc_CC(dest, t0, tmp);
     tcg_temp_free_i32(tmp);
+#ifdef HAS_TRACEWRAP
+    store_cpsr = 1;
+#endif //HAS_TRACEWRAP
 }
 
 #define GEN_SHIFT(name)                                               \
@@ -594,6 +645,9 @@ static inline void gen_arm_shift_im(TCGv_i32 var, int shiftop,
             tcg_temp_free_i32(tmp);
         }
     }
+#ifdef HAS_TRACEWRAP
+    store_cpsr = 1;
+#endif //HAS_TRACEWRAP
 };
 
 static inline void gen_arm_shift_reg(TCGv_i32 var, int shiftop,
@@ -986,12 +1040,18 @@ void gen_aa32_ld_i32(DisasContext *s, TCGv_i32 val, TCGv_i32 a32,
                      int index, MemOp opc)
 {
     gen_aa32_ld_internal_i32(s, val, a32, index, finalize_memop(s, opc));
+    TCGv t = tcg_const_i32(opc);
+    gen_helper_trace_ld(cpu_env, val, a32, t);
+    tcg_temp_free(t);
 }
 
 void gen_aa32_st_i32(DisasContext *s, TCGv_i32 val, TCGv_i32 a32,
                      int index, MemOp opc)
 {
     gen_aa32_st_internal_i32(s, val, a32, index, finalize_memop(s, opc));
+    TCGv t = tcg_const_i32(opc);
+    gen_helper_trace_st(cpu_env, val, a32, t);
+    tcg_temp_free(t);
 }
 
 void gen_aa32_ld_i64(DisasContext *s, TCGv_i64 val, TCGv_i32 a32,
@@ -2559,6 +2619,34 @@ static void gen_goto_ptr(void)
     tcg_gen_lookup_and_goto_ptr();
 }
 
+#ifdef HAS_TRACEWRAP
+static inline void gen_trace_newframe(DisasContext *s)
+{
+    TCGv t = tcg_const_i32(s->pc_curr);
+    gen_helper_trace_newframe(t);
+    tcg_temp_free(t);
+}
+
+static inline void gen_trace_store_cpsr(void)
+{
+    if (!store_cpsr) {
+        return;
+    }
+    gen_helper_log_store_cpsr(cpu_env);
+}
+
+static inline void gen_trace_endframe(DisasContext *s)
+{
+    TCGv_i32 tmp0 = tcg_temp_new_i32();
+    TCGv_i32 tmp1 = tcg_temp_new_i32();
+    tcg_gen_movi_i32(tmp0, s->pc_curr);
+    tcg_gen_movi_i32(tmp1, s->insn_size);
+    gen_helper_trace_endframe(cpu_env, tmp0, tmp1);
+    tcg_temp_free_i32(tmp0);
+    tcg_temp_free_i32(tmp1);
+}
+#endif //HAS_TRACEWRAP
+
 /* This will end the TB but doesn't guarantee we'll return to
  * cpu_loop_exec. Any live exit_requests will be processed as we
  * enter the next TB.
@@ -2579,6 +2667,9 @@ static void gen_goto_tb(DisasContext *s, int n, target_ulong dest)
 /* Jump, specifying which TB number to use if we gen_goto_tb() */
 static inline void gen_jmp_tb(DisasContext *s, uint32_t dest, int tbno)
 {
+#ifdef HAS_TRACEWRAP
+    gen_trace_endframe(s);
+#endif //HAS_TRACEWRAP
     if (unlikely(s->ss_active)) {
         /* An indirect jump so that we still trigger the debug exception.  */
         gen_set_pc_im(s, dest);
@@ -4928,6 +5019,9 @@ static void disas_xscale_insn(DisasContext *s, uint32_t insn)
             unallocated_encoding(s);
         }
     }
+#ifdef HAS_TRACEWRAP
+    store_cpsr = 1;
+#endif //HAS_TRACEWRAP
 }
 
 /* Store a 64-bit value to a register pair.  Clobbers val.  */
@@ -4965,6 +5059,9 @@ static void gen_logicq_cc(TCGv_i32 lo, TCGv_i32 hi)
 {
     tcg_gen_mov_i32(cpu_NF, hi);
     tcg_gen_or_i32(cpu_ZF, lo, hi);
+#ifdef HAS_TRACEWRAP
+    store_cpsr = 1;
+#endif //HAS_TRACEWRAP
 }
 
 /* Load/Store exclusive instructions are implemented by remembering
@@ -8352,7 +8449,13 @@ static bool trans_B_cond_thumb(DisasContext *s, arg_ci *a)
 
 static bool trans_BL(DisasContext *s, arg_i *a)
 {
-    tcg_gen_movi_i32(cpu_R[14], s->base.pc_next | s->thumb);
+    int32_t lr = s->base.pc_next | s->thumb;
+    tcg_gen_movi_i32(cpu_R[14], lr);
+#ifdef HAS_TRACEWRAP
+    TCGv t = tcg_constant_i32(lr);
+    gen_trace_store_reg(14, t);
+    tcg_temp_free(t);
+#endif //HAS_TRACEWRAP
     gen_jmp(s, read_pc(s) + a->imm);
     return true;
 }
@@ -8371,6 +8474,12 @@ static bool trans_BLX_i(DisasContext *s, arg_BLX_i *a)
     if (s->thumb && (a->imm & 2)) {
         return false;
     }
+    int32_t lr = s->base.pc_next | s->thumb;
+#ifdef HAS_TRACEWRAP
+    TCGv t = tcg_constant_i32(lr);
+    gen_trace_store_reg(16, t);
+    tcg_temp_free(t);
+#endif
     tcg_gen_movi_i32(cpu_R[14], s->base.pc_next | s->thumb);
     store_cpu_field_constant(!s->thumb, thumb);
     gen_jmp(s, (read_pc(s) & ~3) + a->imm);
@@ -9087,6 +9196,11 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)
 {
     unsigned int cond = insn >> 28;
 
+#ifdef HAS_TRACEWRAP
+    store_cpsr = 0;
+#endif //HAS_TRACEWRAP
+    s->insn_size = 4;
+
     /* M variants do not implement ARM mode; this must raise the INVSTATE
      * UsageFault exception.
      */
@@ -9207,6 +9321,7 @@ static bool thumb_insn_is_16bit(DisasContext *s, uint32_t pc, uint32_t insn)
 /* Translate a 32-bit thumb instruction. */
 static void disas_thumb2_insn(DisasContext *s, uint32_t insn)
 {
+    s->insn_size = 4;
     /*
      * ARMv6-M supports a limited subset of Thumb2 instructions.
      * Other Thumb1 architectures allow only 32-bit
@@ -9304,6 +9419,7 @@ illegal_op:
 
 static void disas_thumb_insn(DisasContext *s, uint32_t insn)
 {
+    s->insn_size = 2;
     if (!disas_t16(s, insn)) {
         unallocated_encoding(s);
     }
@@ -9541,6 +9657,9 @@ static void arm_post_translate_insn(DisasContext *dc)
         gen_set_label(dc->condlabel);
         dc->condjmp = 0;
     }
+#ifdef HAS_TRACEWRAP
+    gen_trace_endframe(dc);
+#endif //HAS_TRACEWRAP
     translator_loop_temp_check(&dc->base);
 }
 
@@ -9559,7 +9678,13 @@ static void arm_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
     insn = arm_ldl_code(env, &dc->base, dc->base.pc_next, dc->sctlr_b);
     dc->insn = insn;
     dc->base.pc_next += 4;
+#ifdef HAS_TRACEWRAP
+    gen_trace_newframe(dc);
+#endif //HAS_TRACEWRAP
     disas_arm_insn(dc, insn);
+#ifdef HAS_TRACEWRAP
+    gen_trace_store_cpsr();
+#endif //HAS_TRACEWRAP
 
     arm_post_translate_insn(dc);
 
@@ -9694,6 +9819,9 @@ static void thumb_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
         }
     }
 
+#ifdef HAS_TRACEWRAP
+    gen_trace_newframe(dc);
+#endif //HAS_TRACEWRAP
     if (is_16bit) {
         disas_thumb_insn(dc, insn);
     } else {
@@ -9709,6 +9837,10 @@ static void thumb_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
             dc->condexec_cond = 0;
         }
     }
+
+#ifdef HAS_TRACEWRAP
+    gen_trace_store_cpsr();
+#endif //HAS_TRACEWRAP
 
     if (dc->eci && !dc->eci_handled) {
         /*
@@ -9800,6 +9932,9 @@ static void arm_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
         switch (dc->base.is_jmp) {
         case DISAS_NEXT:
         case DISAS_TOO_MANY:
+#ifdef HAS_TRACEWRAP
+            gen_trace_endframe(dc);
+#endif //HAS_TRACEWRAP
             gen_goto_tb(dc, 1, dc->base.pc_next);
             break;
         case DISAS_UPDATE_NOCHAIN:
@@ -9854,6 +9989,9 @@ static void arm_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
         /* "Condition failed" instruction codepath for the branch/trap insn */
         gen_set_label(dc->condlabel);
         gen_set_condexec(dc);
+#ifdef HAS_TRACEWRAP
+            gen_trace_endframe(dc);
+#endif //HAS_TRACEWRAP
         if (unlikely(dc->ss_active)) {
             gen_set_pc_im(dc, dc->base.pc_next);
             gen_singlestep_exception(dc);
@@ -9861,6 +9999,8 @@ static void arm_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
             gen_goto_tb(dc, 1, dc->base.pc_next);
         }
     }
+
+    return;
 }
 
 static void arm_tr_disas_log(const DisasContextBase *dcbase, CPUState *cpu)
