@@ -78,9 +78,9 @@ $ git clone git@github.com:BinaryAnalysisPlatform/qemu.git
 Change folder to qemu and build tracer:
 ```bash
 $ cd qemu
-$ ./configure --prefix=$HOME --with-tracewrap=../bap-frames --target-list="`echo {arm,i386,x86_64,mips}-linux-user`"
-$ make
-$ make install
+$ ./configure --prefix=$HOME --with-tracewrap=../bap-frames --target-list=arm-linux-user
+$ ninja -C build
+$ ninja -C build install
 ```
 
 # Usage
@@ -95,4 +95,4 @@ Hints: use option -L to set the elf interpreter prefix to 'path'. Use
 to download arm and x86 libraries.
 
 # Notes
-  Only ARM, X86, X86-64, MIPS targets are supported in this branch.
+  Only ARM target is supported in this branch.
