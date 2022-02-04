@@ -297,12 +297,17 @@ TCGv_i32 add_reg_for_lit(DisasContext *s, int reg, int ofs)
 
     if (reg == 15) {
         tcg_gen_movi_i32(tmp, (read_pc(s) & ~3) + ofs);
+#ifdef HAS_TRACEWRAP
+        TCGv pc_tmp = tcg_const_i32(read_pc(s));
+        gen_trace_load_reg(reg, pc_tmp);
+        tcg_temp_free_i32(pc_tmp);
+#endif //HAS_TRACEWRAP
     } else {
         tcg_gen_addi_i32(tmp, cpu_R[reg], ofs);
-    }
 #ifdef HAS_TRACEWRAP
-    gen_trace_load_reg(reg, tmp);
+        gen_trace_load_reg(reg, cpu_R[reg]);
 #endif //HAS_TRACEWRAP
+    }
     return tmp;
 }
 
