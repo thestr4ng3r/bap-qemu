@@ -6598,7 +6598,13 @@ static bool trans_BLX_r(DisasContext *s, arg_BLX_r *a)
         return false;
     }
     tmp = load_reg(s, a->rm);
-    tcg_gen_movi_i32(cpu_R[14], s->base.pc_next | s->thumb);
+    target_ulong lr = s->base.pc_next | s->thumb;
+#ifdef HAS_TRACEWRAP
+    TCGv t = tcg_constant_i32(lr);
+    gen_trace_store_reg(14, t);
+    tcg_temp_free(t);
+#endif
+    tcg_gen_movi_i32(cpu_R[14], lr);
     gen_bx(s, tmp);
     return true;
 }
@@ -8508,10 +8514,10 @@ static bool trans_BLX_i(DisasContext *s, arg_BLX_i *a)
     int32_t lr = s->base.pc_next | s->thumb;
 #ifdef HAS_TRACEWRAP
     TCGv t = tcg_constant_i32(lr);
-    gen_trace_store_reg(16, t);
+    gen_trace_store_reg(4, t);
     tcg_temp_free(t);
 #endif
-    tcg_gen_movi_i32(cpu_R[14], s->base.pc_next | s->thumb);
+    tcg_gen_movi_i32(cpu_R[14], lr);
     store_cpu_field_constant(!s->thumb, thumb);
     gen_jmp(s, (read_pc(s) & ~3) + a->imm);
     return true;
