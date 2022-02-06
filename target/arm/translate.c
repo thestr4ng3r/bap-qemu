@@ -67,6 +67,8 @@ static const char * const regnames[] =
 
 
 #ifdef HAS_TRACEWRAP
+/* Set to 1 if cpsr contents have already been written for the current instruction. */
+static int loaded_cpsr = 0;
 /* Set to 1 if an instruction affects cpsr. */
 static int store_cpsr = 0;
 #endif //HAS_TRACEWRAP
@@ -271,6 +273,26 @@ static void gen_trace_store_reg(int reg, TCGv_i32 var)
     gen_helper_trace_store_reg(t, var);
     tcg_temp_free(t);
 }
+
+static void trace_read_cpsr(void)
+{
+    if (loaded_cpsr) {
+        return;
+    }
+    gen_helper_log_read_cpsr(cpu_env);
+    loaded_cpsr = 1;
+}
+
+static void trace_store_cpsr(void)
+{
+    store_cpsr = 1;
+}
+
+static void trace_instr_state_reset(void)
+{
+    loaded_cpsr = 0;
+    store_cpsr = 0;
+}
 #endif //HAS_TRACEWRAP
 
 /* Set a variable to the value of a CPU register.  */
@@ -460,37 +482,42 @@ static void gen_add16(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 /* Set N and Z flags from var.  */
 static inline void gen_logic_CC(TCGv_i32 var)
 {
+#ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
+    trace_store_cpsr();
+#endif //HAS_TRACEWRAP
     tcg_gen_mov_i32(cpu_NF, var);
     tcg_gen_mov_i32(cpu_ZF, var);
-#ifdef HAS_TRACEWRAP
-    store_cpsr = 1;
-#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 + T1 + CF. */
 static void gen_add_carry(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 {
+#ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
+#endif //HAS_TRACEWRAP
     tcg_gen_add_i32(dest, t0, t1);
     tcg_gen_add_i32(dest, dest, cpu_CF);
-#ifdef HAS_TRACEWRAP
-    store_cpsr = 1;
-#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 - T1 + CF - 1.  */
 static void gen_sub_carry(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 {
+#ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
+#endif //HAS_TRACEWRAP
     tcg_gen_sub_i32(dest, t0, t1);
     tcg_gen_add_i32(dest, dest, cpu_CF);
     tcg_gen_subi_i32(dest, dest, 1);
-#ifdef HAS_TRACEWRAP
-    store_cpsr = 1;
-#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 + T1. Compute C, N, V and Z flags */
 static void gen_add_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 {
+#ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
+    trace_store_cpsr();
+#endif //HAS_TRACEWRAP
     TCGv_i32 tmp = tcg_temp_new_i32();
     tcg_gen_movi_i32(tmp, 0);
     tcg_gen_add2_i32(cpu_NF, cpu_CF, t0, tmp, t1, tmp);
@@ -500,14 +527,15 @@ static void gen_add_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
     tcg_gen_andc_i32(cpu_VF, cpu_VF, tmp);
     tcg_temp_free_i32(tmp);
     tcg_gen_mov_i32(dest, cpu_NF);
-#ifdef HAS_TRACEWRAP
-    store_cpsr = 1;
-#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 + T1 + CF.  Compute C, N, V and Z flags */
 static void gen_adc_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 {
+#ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
+    trace_store_cpsr();
+#endif //HAS_TRACEWRAP
     TCGv_i32 tmp = tcg_temp_new_i32();
     if (TCG_TARGET_HAS_add2_i32) {
         tcg_gen_movi_i32(tmp, 0);
@@ -531,14 +559,15 @@ static void gen_adc_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
     tcg_gen_andc_i32(cpu_VF, cpu_VF, tmp);
     tcg_temp_free_i32(tmp);
     tcg_gen_mov_i32(dest, cpu_NF);
-#ifdef HAS_TRACEWRAP
-    store_cpsr = 1;
-#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 - T1. Compute C, N, V and Z flags */
 static void gen_sub_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
 {
+#ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
+    trace_store_cpsr();
+#endif //HAS_TRACEWRAP
     TCGv_i32 tmp;
     tcg_gen_sub_i32(cpu_NF, t0, t1);
     tcg_gen_mov_i32(cpu_ZF, cpu_NF);
@@ -549,9 +578,6 @@ static void gen_sub_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
     tcg_gen_and_i32(cpu_VF, cpu_VF, tmp);
     tcg_temp_free_i32(tmp);
     tcg_gen_mov_i32(dest, cpu_NF);
-#ifdef HAS_TRACEWRAP
-    store_cpsr = 1;
-#endif //HAS_TRACEWRAP
 }
 
 /* dest = T0 + ~T1 + CF.  Compute C, N, V and Z flags */
@@ -561,9 +587,6 @@ static void gen_sbc_CC(TCGv_i32 dest, TCGv_i32 t0, TCGv_i32 t1)
     tcg_gen_not_i32(tmp, t1);
     gen_adc_CC(dest, t0, tmp);
     tcg_temp_free_i32(tmp);
-#ifdef HAS_TRACEWRAP
-    store_cpsr = 1;
-#endif //HAS_TRACEWRAP
 }
 
 #define GEN_SHIFT(name)                                               \
@@ -606,6 +629,10 @@ static void shifter_out_im(TCGv_i32 var, int shift)
 static inline void gen_arm_shift_im(TCGv_i32 var, int shiftop,
                                     int shift, int flags)
 {
+#ifdef HAS_TRACEWRAP
+    trace_read_cpsr();
+    trace_store_cpsr();
+#endif //HAS_TRACEWRAP
     switch (shiftop) {
     case 0: /* LSL */
         if (shift != 0) {
@@ -650,9 +677,6 @@ static inline void gen_arm_shift_im(TCGv_i32 var, int shiftop,
             tcg_temp_free_i32(tmp);
         }
     }
-#ifdef HAS_TRACEWRAP
-    store_cpsr = 1;
-#endif //HAS_TRACEWRAP
 };
 
 static inline void gen_arm_shift_reg(TCGv_i32 var, int shiftop,
@@ -766,6 +790,8 @@ void arm_test_cc(DisasCompare *cmp, int cc)
     if (cc & 1) {
         cond = tcg_invert_cond(cond);
     }
+
+    trace_read_cpsr();
 
  no_invert:
     cmp->cond = cond;
@@ -5025,7 +5051,7 @@ static void disas_xscale_insn(DisasContext *s, uint32_t insn)
         }
     }
 #ifdef HAS_TRACEWRAP
-    store_cpsr = 1;
+    trace_store_cpsr();
 #endif //HAS_TRACEWRAP
 }
 
@@ -5065,7 +5091,7 @@ static void gen_logicq_cc(TCGv_i32 lo, TCGv_i32 hi)
     tcg_gen_mov_i32(cpu_NF, hi);
     tcg_gen_or_i32(cpu_ZF, lo, hi);
 #ifdef HAS_TRACEWRAP
-    store_cpsr = 1;
+    trace_store_cpsr();
 #endif //HAS_TRACEWRAP
 }
 
@@ -9202,7 +9228,7 @@ static void disas_arm_insn(DisasContext *s, unsigned int insn)
     unsigned int cond = insn >> 28;
 
 #ifdef HAS_TRACEWRAP
-    store_cpsr = 0;
+    trace_instr_state_reset();
 #endif //HAS_TRACEWRAP
     s->insn_size = 4;
 
